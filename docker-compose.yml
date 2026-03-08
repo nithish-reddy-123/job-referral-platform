@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: referral_mongo
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - referral_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: referral_redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - referral_network
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: referral_server
+    restart: unless-stopped
+    ports:
+      - '5000:5000'
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/job_referral?authSource=admin
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-your-access-secret-change-me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-refresh-secret-change-me}
+      REDIS_URL: redis://redis:6379
+      CLIENT_URL: http://localhost
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - referral_network
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: referral_client
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    depends_on:
+      - server
+    networks:
+      - referral_network
+
+volumes:
+  mongo_data:
+  redis_data:
+
+networks:
+  referral_network:
+    driver: bridge
